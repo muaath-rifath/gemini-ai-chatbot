@@ -1,7 +1,9 @@
+import Meta from 'gi://Meta';
+import Gio from 'gi://Gio';
 import GObject from 'gi://GObject';
 import St from 'gi://St';
 import GLib from 'gi://GLib';
-import Gio from 'gi://Gio';
+
 
 import {Extension, gettext as _} from 'resource:///org/gnome/shell/extensions/extension.js';
 import * as PanelMenu from 'resource:///org/gnome/shell/ui/panelMenu.js';
@@ -11,9 +13,6 @@ import {convertMD} from "./md2pango.js";
 
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 
-
-// Importing Gemini API client
-import { GoogleGenerativeAI } from '@google/generative-ai';
 
 // Defining necessary variables (Gemini API)
 let GEMINI_API_KEY = "";
@@ -26,13 +25,26 @@ let COLOR_GEMINI_MESSAGE = "";
 let TEMPERATURE = 0.7;
 let MAX_TOKENS = 1024;
 
+const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1/models/';
+
 
 
 // Class that activates the extension
 const Gemini = GObject.registerClass(
 class Gemini extends PanelMenu.Button
 {
-    
+      constructor(extension) {
+        super(0.0, _('Gemini: AI Chatbot'));
+         try {
+           this.extension = extension
+            this._isWayland = Meta.is_wayland_compositor();
+            this._loadSettings();
+            this._init();
+        } catch (e) {
+            console.error(`Gemini Extension Error: ${e}`);
+        }
+    }
+
     _loadSettings () {
         this._settingsChangedId = this.extension.settings.connect('changed', () => {
             this._fetchSettings();
@@ -58,192 +70,208 @@ class Gemini extends PanelMenu.Button
     }
 
 
-    _init(extension) {
+    _init() {
         // --- INITIALIZATION AND ICON IN TOPBAR
-        super._init(0.0, _('Gemini: AI Chatbot'));
-        this.extension = extension
-        this._loadSettings();
-        
-        this.add_child(new St.Icon({
-            icon_name: 'Gemini: AI Chatbot',
-            style_class: 'icon',
-        }));
-
+          try {
+            this.add_child(new St.Icon({
+                icon_name: 'Gemini: AI Chatbot',
+                style_class: 'icon',
+            }));
        
 
-        // ... INITIALIZATION OF SESSION VARIABLES
-        this.history = []
-        this.timeoutCopy = null
-        this.timeoutResponse = null
+            // ... INITIALIZATION OF SESSION VARIABLES
+            this.history = []
+            this.timeoutCopy = null
+            this.timeoutResponse = null
 
 
-        // --- EXTENSION FOOTER
-        this.chatInput = new St.Entry({
-            hint_text: "Chat with me",
-            can_focus: true,
-            track_hover: true,
-            style_class: 'messageInput'
-        });
-
-        // Enter clicked
-        this.chatInput.clutter_text.connect('activate', (actor) => {
-            if (this.timeoutResponse) {
-                GLib.Source.remove(this.timeoutResponse);
-                this.timeoutResponse = null;
-            }
-
-            let input = this.chatInput.get_text();
-
-            
-            this.initializeTextBox('humanMessage', input, BACKGROUND_COLOR_HUMAN_MESSAGE, COLOR_HUMAN_MESSAGE)
-
-            // Add input to chat history
-            this.history.push({
-                "role": "user",
-                "content": input
+            // --- EXTENSION FOOTER
+            this.chatInput = new St.Entry({
+                hint_text: "Chat with me",
+                can_focus: true,
+                track_hover: true,
+                style_class: 'messageInput'
             });
 
-            this.geminiChat();
+            // Enter clicked
+            this.chatInput.clutter_text.connect('activate', (actor) => {
+                if (this.timeoutResponse) {
+                    GLib.Source.remove(this.timeoutResponse);
+                    this.timeoutResponse = null;
+                }
+
+                let input = this.chatInput.get_text();
+
+                
+                this.initializeTextBox('humanMessage', input, BACKGROUND_COLOR_HUMAN_MESSAGE, COLOR_HUMAN_MESSAGE)
+
+                // Add input to chat history
+                this.history.push({
+                    "role": "user",
+                    "content": input
+                });
+
+                this.geminiChat();
+
+                this.chatInput.set_reactive(false)
+                this.chatInput.set_text("I am Thinking...")
+            });
+
+            this.newConversation = new St.Button({ 
+                style: "width: 16px; height:16px; margin-right: 15px; margin-left: 10px'",
+            
+                child: new St.Icon({
+                    icon_name: 'tab-new-symbolic',
+                    style: 'width: 30px; height:30px'}) 
+            });
+
+            this.newConversation.connect('clicked', (actor) => {
+                if (this.chatInput.get_text() == "Create a new conversation (Deletes current)" ||  this.chatInput.get_text() != "I am Thinking...") {
+                    this.history = []
+
+                    const { settings } = this.extension;
+                    settings.set_string("history", "[]");
+
+                    this.chatBox.destroy_all_children()
+                }
+                else {
+
+                    this.initializeTextBox('geminiMessage', "You can't create a new conversation while I am thinking", BACKGROUND_COLOR_GEMINI_MESSAGE, COLOR_GEMINI_MESSAGE);
+                }
+            });
+
+            this.newConversation.connect('enter-event', (actor) => {
+                if (this.chatInput.get_text() == "") {
+                    this.chatInput.set_reactive(false)
+                    this.chatInput.set_text("Create a new conversation (Deletes current)")
+                }
+            });
+
+            this.newConversation.connect('leave-event', (actor) => {
+                if (this.chatInput.get_text() == "Create a new conversation (Deletes current)") {
+                    this.chatInput.set_reactive(true)
+                    this.chatInput.set_text("")
+                }
+            });
+
+
+            let entryBox = new St.BoxLayout({
+                vertical: false,
+                style_class: 'popup-menu-box'
+            });
+
+            entryBox.add_child(this.chatInput);
+            entryBox.add_child(this.newConversation);
+
+
+
+
+            // --- EXTENSION BODY
+            this.chatBox = new St.BoxLayout({
+                vertical: true,
+                style_class: 'popup-menu-box',
+                style: 'text-wrap: wrap'
+            });
 
             this.chatInput.set_reactive(false)
-            this.chatInput.set_text("I am Thinking...")
-        });
+            this.chatInput.set_text("Loading history...")
+            this._loadHistory();
 
-        this.newConversation = new St.Button({ 
-            style: "width: 16px; height:16px; margin-right: 15px; margin-left: 10px'",
-        
-            child: new St.Icon({
-                icon_name: 'tab-new-symbolic',
-                style: 'width: 30px; height:30px'}) 
-        });
+            this.chatView = new St.ScrollView({
+                enable_mouse_scrolling: true,
+                style_class: 'chat-scrolling',
+                reactive: true
+            });
 
-        this.newConversation.connect('clicked', (actor) => {
-            if (this.chatInput.get_text() == "Create a new conversation (Deletes current)" ||  this.chatInput.get_text() != "I am Thinking...") {
-                this.history = []
-
-                const { settings } = this.extension;
-                settings.set_string("history", "[]");
-
-                this.chatBox.destroy_all_children()
-            }
-            else {
-
-                this.initializeTextBox('geminiMessage', "You can't create a new conversation while I am thinking", BACKGROUND_COLOR_GEMINI_MESSAGE, COLOR_GEMINI_MESSAGE);
-            }
-        });
-
-        this.newConversation.connect('enter-event', (actor) => {
-            if (this.chatInput.get_text() == "") {
-                this.chatInput.set_reactive(false)
-                this.chatInput.set_text("Create a new conversation (Deletes current)")
-            }
-        });
-
-        this.newConversation.connect('leave-event', (actor) => {
-            if (this.chatInput.get_text() == "Create a new conversation (Deletes current)") {
-                this.chatInput.set_reactive(true)
-                this.chatInput.set_text("")
-            }
-        });
+            this.chatView.set_child(this.chatBox);
 
 
-        let entryBox = new St.BoxLayout({
-            vertical: false,
-            style_class: 'popup-menu-box'
-        });
+            // --- EXTENSION PARENT BOX LAYOUT
 
-        entryBox.add_child(this.chatInput);
-        entryBox.add_child(this.newConversation);
+            let layout = new St.BoxLayout({
+                vertical: true,
+                style_class: 'popup-menu-box'
+            });
 
+            layout.add_child(this.chatView);
+            layout.add_child(entryBox);
 
+            
+            // --- ADDING EVERYTHING TOGETHER TO APPEAR AS A POP UP MENU
+            let popUp = new PopupMenu.PopupMenuSection();
+            popUp.actor.add_child(layout);
 
-
-        // --- EXTENSION BODY
-        this.chatBox = new St.BoxLayout({
-            vertical: true,
-            style_class: 'popup-menu-box',
-            style: 'text-wrap: wrap'
-        });
-
-        this.chatInput.set_reactive(false)
-        this.chatInput.set_text("Loading history...")
-        this._loadHistory();
-
-        this.chatView = new St.ScrollView({
-            enable_mouse_scrolling: true,
-            style_class: 'chat-scrolling',
-            reactive: true
-        });
-
-        this.chatView.set_child(this.chatBox);
-
-
-        // --- EXTENSION PARENT BOX LAYOUT
-
-        let layout = new St.BoxLayout({
-            vertical: true,
-            style_class: 'popup-menu-box'
-        });
-
-        layout.add_child(this.chatView);
-        layout.add_child(entryBox);
-
-        
-        // --- ADDING EVERYTHING TOGETHER TO APPEAR AS A POP UP MENU
-        let popUp = new PopupMenu.PopupMenuSection();
-        popUp.actor.add_child(layout);
-
-        this.menu.addMenuItem(popUp);
+            this.menu.addMenuItem(popUp);
+       } catch (e) {
+            console.error(`Gemini Extension _init Error: ${e}`);
+        }
 
         
     };
 
     _loadHistory() {
-        this.history = HISTORY
+           try{
 
-        this.history.forEach(json => {
-            if (json.role == "user") {
-                this.initializeTextBox("humanMessage", convertMD(json.content), BACKGROUND_COLOR_HUMAN_MESSAGE, COLOR_HUMAN_MESSAGE);
-            }
-            else {
-                this.initializeTextBox("geminiMessage", convertMD(json.content), BACKGROUND_COLOR_GEMINI_MESSAGE, COLOR_GEMINI_MESSAGE);
-            }
-        });
+                this.history = HISTORY
+                this.history.forEach(json => {
+                    if (json.role == "user") {
+                        this.initializeTextBox("humanMessage", convertMD(json.content), BACKGROUND_COLOR_HUMAN_MESSAGE, COLOR_HUMAN_MESSAGE);
+                    }
+                    else {
+                        this.initializeTextBox("geminiMessage", convertMD(json.content), BACKGROUND_COLOR_GEMINI_MESSAGE, COLOR_GEMINI_MESSAGE);
+                    }
+                });
 
-        this.chatInput.set_reactive(true)
-        this.chatInput.set_text("")
+                this.chatInput.set_reactive(true)
+                this.chatInput.set_text("")
+            } catch (e) {
+                    console.error(`Gemini Extension _loadHistory Error: ${e}`);
+            }
 
         return;
     }
     
     async geminiChat() {
-        try {
-            // initialize gemini
-            const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
-            const model = genAI.getGenerativeModel({ model: GEMINI_MODEL });
+       try {
+            const geminiApiUrl = `${GEMINI_API_URL}${GEMINI_MODEL}:generateContent`;
 
-            const chat = model.startChat({
-                history: this.history,
+            const headers = {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${GEMINI_API_KEY}`
+            };
+
+            const body = JSON.stringify({
+                 contents: [{ parts: [{ text: this.history[this.history.length - 1].content}] }],
                 generationConfig: {
-                  temperature: TEMPERATURE,
-                   maxOutputTokens: MAX_TOKENS,
-                },
-              });
+                    temperature: TEMPERATURE,
+                    maxOutputTokens: MAX_TOKENS
+                }
+            });
+
+             let response = await fetch(geminiApiUrl, {
+                method: 'POST',
+                headers: headers,
+                body: body
+            });
 
 
-             const result = await chat.sendMessage(this.history[this.history.length -1].content);
+            if (!response.ok) {
+                const error = await response.json()
+                throw new Error(`Gemini API Error ${response.status}: ${error.error.message}`);
+            }
 
 
-             const response = result.response.text();
-
+             const result = await response.json();
+            
+            const responseText = result.candidates[0].content.parts[0].text
                 
-            let final = convertMD(response);
-            this.initializeTextBox('geminiMessage', final, BACKGROUND_COLOR_GEMINI_MESSAGE, COLOR_GEMINI_MESSAGE);
+            let final = convertMD(responseText);
+             this.initializeTextBox('geminiMessage', final, BACKGROUND_COLOR_GEMINI_MESSAGE, COLOR_GEMINI_MESSAGE);
 
              // Add input to chat history
              this.history.push({
                 "role": "assistant",
-                "content": response
+                "content": responseText
             });
 
             const { settings } = this.extension;
@@ -252,11 +280,12 @@ class Gemini extends PanelMenu.Button
             this.chatInput.set_reactive(true);
             this.chatInput.set_text("");
 
+
         } catch (error) {
                 let response = "Oh no! It seems like the Gemini model you entered is either down or not correct or that there is no internet connection. Make sure you didn't make any errors when inputting it in the settings. You can always use the default extension model (sent in the next message). Check your connection either way";
     
                 this.initializeTextBox('geminiMessage', response, BACKGROUND_COLOR_GEMINI_MESSAGE, COLOR_GEMINI_MESSAGE);
-                this.initializeTextBox('geminiMessage', "gemini-pro", BACKGROUND_COLOR_GEMINI_MESSAGE, COLOR_GEMINI_MESSAGE);
+                 this.initializeTextBox('geminiMessage', "gemini-pro", BACKGROUND_COLOR_GEMINI_MESSAGE, COLOR_GEMINI_MESSAGE);
     
                 let settingsButton = new St.Button({
                     label: "Click here to check or change your model ID", can_focus: true,  toggle_mode: true
@@ -354,18 +383,30 @@ class Gemini extends PanelMenu.Button
 
 
 export default class GeminiExtension extends Extension {
+    constructor(metadata) {
+        super(metadata);
+         try {
+             this._gemini = new Gemini(this);
+            this._isWayland = Meta.is_wayland_compositor();
+        } catch (e) {
+            console.error(`Gemini Extension Constructor Error: ${e}`);
+        }
+    }
     enable() {
-        this._gemini = new Gemini({
-            settings: this.getSettings(),
-            clipboard: St.Clipboard.get_default(),
-            openSettings: this.openPreferences,
-            uuid: this.uuid
-        });
-
-        Main.panel.addToStatusArea(this.uuid, this._gemini);
+        try {
+            Main.panel.addToStatusArea(this.uuid, this._gemini);
+            }
+             catch (e) {
+            console.error(`Gemini Extension Enable Error: ${e}`);
+            return false;
+        }
     }
     disable() {
-        this._gemini.destroy();
-        this._gemini = null;
+       try {
+             this._gemini.destroy();
+            this._gemini = null;
+       } catch (e) {
+            console.error(`Gemini Extension Disable Error: ${e}`);
+        }
     }
 }

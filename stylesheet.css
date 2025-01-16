@@ -1,6 +1,6 @@
 .icon {
-    background-image: url("assets/icon.png"); /* UI icons by Flaticon: https://www.flaticon.com/uicons */
-    mask-image: url("assets/icon.png");
+    background-image: url("assets/icon.svg");
+    mask-image: url("assets/icon.svg");
     background-size: 15px;
     width: 15px;
     height: 15px;
@@ -23,12 +23,12 @@
     border-radius: 100px;
     max-width: 400px;
     margin-left: 15px;
-    max-height:400px;
+    max-height: 400px;
     overflow: hidden;
 }
 
 .humanMessage {
-    text-wrap:wrap;
+    text-wrap: wrap;
     text-align: left;
     text-size-adjust: 12;
     font-weight: bolder;
@@ -37,13 +37,14 @@
     border: 10px;
     border-radius: 13px;
 }
+
 .humanMessage-box {
     margin-left: 40px;
     margin-top: 5px;
 }
 
 .geminiMessage {
-    text-wrap:wrap;
+    text-wrap: wrap;
     text-align: left;
     text-size-adjust: 12;
     font-weight: bolder;
@@ -59,7 +60,7 @@
 }
 
 .settings {
-    text-wrap:wrap;
+    text-wrap: wrap;
     text-align: left;
     margin-right: 40px;
     text-size-adjust: 12;
@@ -68,4 +69,35 @@
     font-size: medium;
     border: 10px;
     border-radius: 13px;  
+}
+
+/* Wayland-specific styles */
+@supports (-gtk-scrollbar-width: thin) {
+    .wayland-mode {
+        background-color: rgba(0, 0, 0, 0.85);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .wayland-mode .messageInput {
+        background: none;
+        background-color: rgba(255, 255, 255, 0.05);
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    }
+
+    .wayland-mode .humanMessage,
+    .wayland-mode .geminiMessage {
+        background-image: none;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+    }
+
+    .wayland-mode .chat-scrolling {
+        scrollbar-width: thin;
+        -gtk-scrollbar-width: thin;
+    }
+
+    .wayland-mode .settings {
+        background-image: none;
+        background-color: @theme_bg_color;
+        border: 1px solid @borders;
+    }
 }
