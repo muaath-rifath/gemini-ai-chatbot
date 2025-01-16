@@ -1,0 +1,21 @@
+{
+    "name": "gemini-ai-chatbot",
+    "version": "1.0.0",
+    "description": "GNOME Shell extension for Gemini AI chatbot.",
+    "main": "extension.js",
+    "scripts": {
+        "test": "echo \"Error: no test specified\" && exit 1"
+    },
+    "keywords": [
+        "gnome",
+        "extension",
+        "gemini",
+        "ai",
+        "chatbot"
+    ],
+    "author": "Your Name",
+    "license": "GPL-3.0",
+    "dependencies": {
+        "@google/generative-ai": "^0.2.1"
+    }
+}

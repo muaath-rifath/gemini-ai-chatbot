@@ -1,0 +1,51 @@
+<schemalist gettext-domain="gnome-shell-extensions">
+  <schema id="org.gnome.shell.extensions.gemini-ai-chatbot"
+      path="/org/gnome/shell/extensions/gemini-ai-chatbot/">
+
+    <key name="gemini-api-key" type="s">
+        <default>"Input your Gemini API key here"</default>
+        <summary>Gemini API Key</summary>
+        <description>Add the Gemini API Key in order to use this extension</description>
+    </key>
+    <key name="gemini-model" type="s">
+        <default>"gemini-pro"</default>
+        <summary>Gemini Model</summary>
+        <description>Gemini model for prompting</description>
+    </key>
+    <key name="history" type="s">
+        <default>"[]"</default>
+        <summary>Chat History</summary>
+        <description>Saving chat history as JSON.Stringify</description>
+    </key>
+        <key name="human-message-color" type="s">
+        <default>"rgb(0, 106, 255)"</default>
+        <summary>Background Color of Human Message</summary>
+        <description>Customizing</description>
+    </key>
+    <key name="gemini-message-color" type="s">
+        <default>"rgb(96,99,102)"</default>
+        <summary>Background Color of Gemini message</summary>
+        <description>Customizing</description>
+    </key>
+    <key name="gemini-message-text-color" type="s">
+        <default>"rgb(255,255,255)"</default>
+        <summary>Text Color of Gemini message</summary>
+        <description>Customizing</description>
+    </key>
+    <key name="human-message-text-color" type="s">
+        <default>"rgb(255,255,255)"</default>
+        <summary>Text Color of Human message</summary>
+        <description>Customizing</description>
+    </key>
+    <key name="temperature" type="d">
+      <default>0.7</default>
+      <summary>Temperature</summary>
+      <description>Controls the randomness of the response</description>
+    </key>
+    <key name="max-tokens" type="i">
+      <default>1024</default>
+      <summary>Max Tokens</summary>
+      <description>Limits the number of tokens in the response</description>
+    </key>
+  </schema>
+</schemalist>
