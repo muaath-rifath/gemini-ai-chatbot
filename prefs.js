@@ -1,5 +1,3 @@
-// Made by @martijara
-
 import Gtk from 'gi://Gtk';
 import Adw from 'gi://Adw';
 
