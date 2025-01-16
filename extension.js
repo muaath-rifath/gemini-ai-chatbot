@@ -1,5 +1,3 @@
-// Made by @martijara
-
 import GObject from 'gi://GObject';
 import St from 'gi://St';
 import GLib from 'gi://GLib';
