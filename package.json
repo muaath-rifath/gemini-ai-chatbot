@@ -13,7 +13,7 @@
         "ai",
         "chatbot"
     ],
-    "author": "Your Name",
+    "author": "Mohamed Muaath Rifath L M",
     "license": "GPL-3.0",
     "dependencies": {
         "@google/generative-ai": "^0.2.1"
