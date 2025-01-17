@@ -1,6 +1,10 @@
+.system-status-icon {
+    width: 16px;
+    height: 16px;
+    padding: 0 4px;
+}
+
 .icon {
-    background-image: url("assets/icon.svg");
-    mask-image: url("assets/icon.svg");
     background-size: 15px;
     width: 15px;
     height: 15px;
@@ -95,9 +99,9 @@
         -gtk-scrollbar-width: thin;
     }
 
-    .wayland-mode .settings {
+     .wayland-mode .settings {
         background-image: none;
-        background-color: @theme_bg_color;
-        border: 1px solid @borders;
+        background-color: #f0f0f0;
+        border: 1px solid #e0e0e0;
     }
 }
